@@ -1,0 +1,8 @@
+@0001000
+20210005 // addi r[1], r[1], 0x5
+20420001 // addi r[2], r[2], 0x1
+0c001005 // jal sub Jump to subtration instruction
+6c000000 // push Push into stack for printing.
+00000000 // nop Only need to do 300 ns not 5000.
+00220022 // sub: sub r[0], r[1], r[2] 
+03e00008 // jr r[31] back to jal + 1 location
