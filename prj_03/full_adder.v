@@ -20,14 +20,13 @@
 `include "prj_definition.v"
 
 module FULL_ADDER(S, CO, A, B, CI);
-output S, CO;
-input A, B, CI;
-wire H1_Y, H1_C, H2_C;
-
-HALF_ADDER h1_inst(.Y(H1_Y), .C(H1_C), .A(A), .B(B));
-
-HALF_ADDER h2_inst(.Y(S), .C(H2_C), .A(H1_Y), .B(CI));
-
-or or_inst(CO, H1_C, H2_C);
-
+	output S, CO;
+	input A, B, CI;
+	wire H1_Y, H1_C, H2_C;
+	
+	HALF_ADDER h1_inst(.Y(H1_Y), .C(H1_C), .A(A), .B(B));
+	
+	HALF_ADDER h2_inst(.Y(S), .C(H2_C), .A(H1_Y), .B(CI));
+	
+	or or_inst(CO, H1_C, H2_C);
 endmodule

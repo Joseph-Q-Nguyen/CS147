@@ -66,16 +66,28 @@ begin
 #10     DATA_REG=i; READ=1'b0; WRITE=1'b1; ADDR_W = i;
 end
 
-#5 READ=1'b0; WRITE=1'b0;
+// Read Cycle
+#10		READ=1'b0; WRITE=1'b0;
+		$write("[TEST] Read %1b, Write %1b, expecting 32'hzzzzzzzz, 32'hzzzzzzzz, got %8h, %8h [FAILED]\n", READ, WRITE, DATA_R1, DATA_R2);
+#5    	no_of_test = no_of_test + 1;
+		if (DATA_R1!== {`DATA_WIDTH{1'bz}} || DATA_R2!== {`DATA_WIDTH{1'bz}})
+			$write("[TEST] Read %1b, Write %1b, expecting 32'hzzzzzzzz, 32'hzzzzzzzz, got %8h, %8h [FAILED]\n", READ, WRITE, DATA_R1, DATA_R2);
+		else 
+			no_of_pass  = no_of_pass + 1;
+
+#10 READ=1'b0; WRITE=1'b0;
 // test of write data
 for(i=0;i<32; i = i + 1)
 begin
 #5      READ=1'b1; WRITE=1'b0; ADDR_R1 = i; ADDR_R2 = i;
 #5      no_of_test = no_of_test + 1;
-        if (DATA_R1 !== i)
-	    $write("[TEST @ %0dns] Read %1b, Write %1b, expecting %8h, got %8h [FAILED]\n", $time, READ, WRITE, i, DATA_R1);
+        if (DATA_R1 !== i && DATA_R2 !== i)
+		begin
+			$write("[TEST @ %0dns] Read %1b, Write %1b, expecting %8h, got %8h [FAILED] (DATA_R1)\n", $time, READ, WRITE, i, DATA_R1);
+			$write("[TEST @ %0dns] Read %1b, Write %1b, expecting %8h, got %8h [FAILED] (DATA_R2)\n", $time, READ, WRITE, i, DATA_R2);
+		end
         else 
-	    no_of_pass  = no_of_pass + 1;
+			no_of_pass  = no_of_pass + 1;
 end
 
 
@@ -88,5 +100,5 @@ end
     $stop;
 
 end
-endmodule;
+endmodule
 

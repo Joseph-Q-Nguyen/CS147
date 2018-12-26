@@ -1,84 +1,39 @@
 // Name: control_unit.v
 // Module: CONTROL_UNIT
-// Output: RF_DATA_W  : Data to be written at register file address RF_ADDR_W
-//         RF_ADDR_W  : Register file address of the memory location to be written
-//         RF_ADDR_R1 : Register file address of the memory location to be read for RF_DATA_R1
-//         RF_ADDR_R2 : Registere file address of the memory location to be read for RF_DATA_R2
-//         RF_READ    : Register file Read signal
-//         RF_WRITE   : Register file Write signal
-//         ALU_OP1    : ALU operand 1
-//         ALU_OP2    : ALU operand 2
-//         ALU_OPRN   : ALU operation code
-//         MEM_ADDR   : Memory address to be read in
-//         MEM_READ   : Memory read signal
-//         MEM_WRITE  : Memory write signal
-//         
-// Input:  RF_DATA_R1 : Data at ADDR_R1 address
-//         RF_DATA_R2 : Data at ADDR_R1 address
-//         ALU_RESULT    : ALU output data
-//         CLK        : Clock signal
-//         RST        : Reset signal
+// Output: CTRL  : Control signal for data path
+//         READ  : Memory read signal
+//         WRITE : Memory Write signal
 //
-// INOUT: MEM_DATA    : Data to be read in from or write to the memory
+// Input:  ZERO : Zero status from ALU
+//         CLK  : Clock signal
+//         RST  : Reset Signal
 //
 // Notes: - Control unit synchronize operations of a processor
+//          Assign each bit of control signal to control one part of data path
 //
 // Revision History:
 //
 // Version	Date		Who		email			note
 //------------------------------------------------------------------------------------------
 //  1.0     Sep 10, 2014	Kaushik Patra	kpatra@sjsu.edu		Initial creation
-//  1.1     Oct 19, 2014        Kaushik Patra   kpatra@sjsu.edu         Added ZERO status output
 //------------------------------------------------------------------------------------------
 `include "prj_definition.v"
-module CONTROL_UNIT(MEM_DATA, RF_DATA_W, RF_ADDR_W, RF_ADDR_R1, RF_ADDR_R2, RF_READ, RF_WRITE,
-                    ALU_OP1, ALU_OP2, ALU_OPRN, MEM_ADDR, MEM_READ, MEM_WRITE,
-                    RF_DATA_R1, RF_DATA_R2, ALU_RESULT, ZERO, CLK, RST); 
-
+module CONTROL_UNIT(CTRL, READ, WRITE, ZERO, INSTRUCTION, CLK, RST); 
 // Output signals
-// Outputs for register file 
-output [`DATA_INDEX_LIMIT:0] RF_DATA_W;
-output [`ADDRESS_INDEX_LIMIT:0] RF_ADDR_W, RF_ADDR_R1, RF_ADDR_R2;
-output RF_READ, RF_WRITE;
-// Outputs for ALU
-output [`DATA_INDEX_LIMIT:0]  ALU_OP1, ALU_OP2;
-output  [`ALU_OPRN_INDEX_LIMIT:0] ALU_OPRN;
-// Outputs for memory
-output [`ADDRESS_INDEX_LIMIT:0]  MEM_ADDR;
-output MEM_READ, MEM_WRITE;
+output [`CTRL_WIDTH_INDEX_LIMIT:0]  CTRL;
+output READ, WRITE;
 
-// Input signals
-input [`DATA_INDEX_LIMIT:0] RF_DATA_R1, RF_DATA_R2, ALU_RESULT;
+reg [`CTRL_WIDTH_INDEX_LIMIT:0] CTRL;
+reg READ, WRITE;
+
+// input signals
 input ZERO, CLK, RST;
-
-// Inout signal
-inout [`DATA_INDEX_LIMIT:0] MEM_DATA;
+input [`DATA_INDEX_LIMIT:0] INSTRUCTION;
 
 // State nets
-wire [2:0] proc_state;
-
+wire [2:0] proc_state;		
 PROC_SM state_machine(.STATE(proc_state),.CLK(CLK),.RST(RST));
-
-// Output register
-
-// Registers for register file 
-reg [`DATA_INDEX_LIMIT:0] RF_DATA_W;
-reg [`ADDRESS_INDEX_LIMIT:0] RF_ADDR_W, RF_ADDR_R1, RF_ADDR_R2;
-reg RF_READ, RF_WRITE;
-// Registers for ALU
-reg [`DATA_INDEX_LIMIT:0]  ALU_OP1, ALU_OP2;
-reg  [`ALU_OPRN_INDEX_LIMIT:0] ALU_OPRN;
-// Registers for memory
-reg [`ADDRESS_INDEX_LIMIT:0]  MEM_ADDR; 
-reg MEM_READ, MEM_WRITE;
-// Register for inout
-reg [`DATA_INDEX_LIMIT:0] MEM_DATA;
-
-reg [`DATA_INDEX_LIMIT:0] write_data;
-
-assign MEM_DATA = ((MEM_READ===1'b1)&&(MEM_WRITE===1'b0))?{`DATA_WIDTH{1'bz} }:write_data;
-
-reg [`DATA_INDEX_LIMIT:0] PC_REG, INST_REG, SP_REG; // internal registers
+	
 
 // register for instruction
 reg [5:0] opcode;
@@ -93,233 +48,40 @@ reg [25:0] address;
 // register for i-type
 reg [`DATA_INDEX_LIMIT:0] SIGN_EXT, ZERO_EXT, LUI, JUMP_ADDR;
 
-initial
-begin
-	PC_REG = `INST_START_ADDR;
-	SP_REG = `INIT_STACK_POINTER;
-end
 
-
-always @ (proc_state)
+always @ (posedge CLK)
 begin
 	case(proc_state)
 		`PROC_FETCH :  
 		begin
-			MEM_ADDR = PC_REG;
-			MEM_READ = 1'b1;
-			MEM_WRITE = 1'b0;
-			RF_READ = 1'b1;
-			RF_WRITE = 1'b1;
+			CTRL = 32'h08000020;
+			READ = 1'b1;
+			WRITE = 1'b0;
 		end
 		`PROC_DECODE : 
 		begin
-			INST_REG = MEM_DATA;
-			// parse the instruction
-			// R-type
-			{opcode, rs, rt, rd, shamt, funct} = INST_REG;
-			// I-type
-			{opcode, rs, rt, immediate } = INST_REG;
-			// J-type
-			{opcode, address} = INST_REG;
-				
-			SIGN_EXT = {{16{immediate[15]}}, immediate};
-			ZERO_EXT = {16'b0, immediate};
-			LUI = {immediate, 16'b0};
-			JUMP_ADDR = {6'b0, address};
-		
-			RF_ADDR_R1 = rs;
-			RF_ADDR_R2 = rt;
-			RF_READ = 1'b1;
-			RF_WRITE = 1'b0;
-			print_instruction(INST_REG);
+			CTRL = 32'h00000110;
+			READ = 1'b0;
+			WRITE = 1'b0;
+			print_instruction(INSTRUCTION);
 		end
 		`PROC_EXE :
 		begin
-			case(opcode)
-				6'b0 : // R-TYPE
-				begin
-					case(funct)
-						6'h20:  ALU_OPRN = `ALU_OPRN_WIDTH'h01;
-						6'h22:	ALU_OPRN = `ALU_OPRN_WIDTH'h02;
-						6'h2c:	ALU_OPRN = `ALU_OPRN_WIDTH'h03;
-						6'h24:	ALU_OPRN = `ALU_OPRN_WIDTH'h06;
-						6'h25:	ALU_OPRN = `ALU_OPRN_WIDTH'h07;
-						6'h27:	ALU_OPRN = `ALU_OPRN_WIDTH'h08;
-						6'h2a:	ALU_OPRN = `ALU_OPRN_WIDTH'h09;
-						6'h01:	ALU_OPRN = `ALU_OPRN_WIDTH'h04;
-						6'h02:	ALU_OPRN = `ALU_OPRN_WIDTH'h05;
-					endcase
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = (funct === 6'h01 || funct === 6'h02) ? shamt : RF_DATA_R2;
-				end
-				// I-TYPE
-				6'h08:	// addi
-				begin	
-					ALU_OPRN = `ALU_OPRN_WIDTH'h01;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = SIGN_EXT;
-				end
-				6'h1d: 	// muli
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h03;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = SIGN_EXT;
-				end
-				6'h0c: 	// andi
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h06;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = ZERO_EXT;
-				end
-				6'h0d: 	//ori
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h07;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = ZERO_EXT;
-				end
-				6'h0a: 	// slti
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h09;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = SIGN_EXT;
-				end
-				6'h04, 6'h05 : // beq and bne
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h01;
-					ALU_OP1 = PC_REG + 1;
-					ALU_OP2 = SIGN_EXT;
-				end
-				6'h23, 6'h2b:  // lw and sw
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h01;
-					ALU_OP1 = RF_DATA_R1;
-					ALU_OP2 = SIGN_EXT;
-				end
-				// j-type
-				6'h1b: 	// push
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h02;
-					ALU_OP1 = SP_REG;
-					ALU_OP2 = 1;
-					RF_ADDR_R1 = 0;
-					RF_READ = 1'b1;
-					RF_WRITE = 1'b0;
-				end
-				6'h1c: 	// pop
-				begin
-					ALU_OPRN = `ALU_OPRN_WIDTH'h01;
-					ALU_OP1 = SP_REG;
-					ALU_OP2 = 1;
-				end
-			endcase
+			CTRL = 32'h00600000;
+			READ = 1'b0;
+			WRITE = 1'b0;
 		end
 		`PROC_MEM :
 		begin
-			case(opcode)
-				6'h23:  //lw
-				begin
-					MEM_ADDR = ALU_RESULT;
-					MEM_READ = 1'b1;
-					MEM_WRITE = 1'b0;
-				end
-				6'h2b:	//sw 
-				begin
-					MEM_ADDR = ALU_RESULT;
-					write_data = RF_DATA_R2;
-					MEM_READ = 1'b0;
-					MEM_WRITE = 1'b1;
-				end
-				6'h1b: 	// push
-				begin
-					MEM_ADDR = SP_REG;
-					write_data = RF_DATA_R1;
-					MEM_READ = 1'b0;
-					MEM_WRITE = 1'b1;
-					SP_REG = ALU_RESULT;
-				end
-				6'h1c: 	// pop
-				begin
-					SP_REG = ALU_RESULT;
-					MEM_ADDR = SP_REG;
-					MEM_READ = 1'b1;
-					MEM_WRITE = 1'b0;
-				end
-				default:
-				begin
-					MEM_READ = 1'b1;
-					MEM_WRITE = 1'b1;
-				end
-			endcase
+			CTRL = 32'h00600000;
+			READ = 1'b0;
+			WRITE = 1'b0;
 		end
 		`PROC_WB :
 		begin
-			PC_REG = PC_REG + 1;
-			MEM_READ = 1'b0;
-			MEM_WRITE = 1'b0;
-			case(opcode)
-				6'b0 : // R-TYPE
-				begin
-					case(funct)
-						6'h20, 6'h22, 6'h2c, 6'h24, 6'h25, 6'h27, 6'h2a, 6'h01, 6'h02 :  
-						begin	
-							RF_ADDR_W = rd;
-							RF_DATA_W = ALU_RESULT;
-							RF_READ = 1'b0;
-							RF_WRITE = 1'b1;
-						end
-						6'h08:	PC_REG = RF_DATA_R1; // if jump register, set pc to r1
-					endcase
-				end	
-				// I-TYPE
-				6'h08, 6'h1d, 6'h0c, 6'h0d, 6'h0a :	
-				begin	
-					RF_ADDR_W = rt;
-					RF_DATA_W = ALU_RESULT;
-					RF_READ = 1'b0;
-					RF_WRITE = 1'b1;
-				end
-				6'h0f:
-				begin
-					RF_ADDR_W = rt;
-					RF_DATA_W = LUI;
-					RF_READ = 1'b0;
-					RF_WRITE = 1'b1;
-				end 
-				6'h04: 
-				begin
-					if (RF_DATA_R1 === RF_DATA_R2)
-						PC_REG = ALU_RESULT;
-				end
-				6'h05: 
-				begin
-					if (RF_DATA_R1 !== RF_DATA_R2)
-						PC_REG = ALU_RESULT;
-				end
-				6'h23:  //lw
-				begin
-					RF_ADDR_W = rt;
-					RF_DATA_W = MEM_DATA;
-					RF_READ = 1'b0;
-					RF_WRITE = 1'b1;
-				end
-				// J-TYPE
-				6'h02: 	PC_REG = JUMP_ADDR; // jmp
-				6'h03: //jal
-				begin
-					RF_ADDR_W = 31;
-					RF_DATA_W = PC_REG;
-					RF_READ = 1'b0;
-					RF_WRITE = 1'b1;
-					PC_REG = JUMP_ADDR;
-				end
-				6'h1c: 	// pop
-				begin
-					RF_ADDR_W = 0;
-					RF_DATA_W = MEM_DATA;
-					RF_READ = 1'b0;
-					RF_WRITE = 1'b1;
-				end
-			endcase
+			CTRL = 32'h0060920B;
+			READ = 1'b0;
+			WRITE = 1'b0;
 		end	
 	endcase
 end
@@ -383,11 +145,11 @@ $write("\n");
 end
 endtask
 
-
 endmodule
 
+
 //------------------------------------------------------------------------------------------
-// Module: CONTROL_UNIT
+// Module: PROC_SM
 // Output: STATE      : State of the processor
 //         
 // Input:  CLK        : Clock signal
@@ -405,38 +167,37 @@ endmodule
 //  1.0     Sep 10, 2014	Kaushik Patra	kpatra@sjsu.edu		Initial creation
 //------------------------------------------------------------------------------------------
 module PROC_SM(STATE,CLK,RST);
-// list of inputs
-input CLK, RST;
-// list of outputs
-output [2:0] STATE;
+	// list of inputs
+	input CLK, RST;
+	// list of outputs
+	output [2:0] STATE;
+	
+	reg [2:0] STATE;
+	reg [2:0] next_state;
+	
+	initial
+	begin	
+		STATE = 2'bxx;
+		next_state = `PROC_FETCH;
+	end
+	
+	// reset on negative edge of RST
+	always @ (negedge RST)
+	begin
+		STATE = 2'bxx;
+		next_state = `PROC_FETCH;
+	end
+	
+	always @ (posedge CLK)	
+	begin
+		case(STATE)
+			`PROC_FETCH : next_state = `PROC_DECODE;
+			`PROC_DECODE : next_state = `PROC_EXE;
+			`PROC_EXE : next_state = `PROC_MEM;
+			`PROC_MEM : next_state = `PROC_WB;
+			`PROC_WB : next_state = `PROC_FETCH;
+		endcase	
+		STATE = next_state;
+	end
 
-reg [2:0] STATE;
-reg [2:0] next_state;
-
-initial
-begin	
-	STATE = 2'bxx;
-	next_state = `PROC_FETCH;
-end
-
-// reset on negative edge of RST
-always @ (negedge RST)
-begin
-	STATE = 2'bxx;
-	next_state = `PROC_FETCH;
-end
-
-always @ (posedge CLK)	
-begin
-	case(STATE)
-		`PROC_FETCH : next_state = `PROC_DECODE;
-   		`PROC_DECODE : next_state = `PROC_EXE;
-   		`PROC_EXE : next_state = `PROC_MEM;
-   		`PROC_MEM : next_state = `PROC_WB;
-   		`PROC_WB : next_state = `PROC_FETCH;
-	endcase	
-	STATE = next_state;
-end
 endmodule
-
-

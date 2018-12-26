@@ -19,10 +19,9 @@
 `include "prj_definition.v"
 
 module HALF_ADDER(Y,C,A,B);
-output Y,C;
-input A,B;
-
-xor inst1(Y, A, B);
-and inst2(C, A, B);
-
+	output Y,C;
+	input A,B;
+	
+	xor inst1(Y, A, B);
+	and inst2(C, A, B);
 endmodule;
